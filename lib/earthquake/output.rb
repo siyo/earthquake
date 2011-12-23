@@ -84,6 +84,7 @@ module Earthquake
 
     output :tweet do |item|
       next unless item["text"]
+      next if cache.read("status:#{item["id"]}")
 
       info = []
       if item["in_reply_to_status_id"]

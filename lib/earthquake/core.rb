@@ -133,11 +133,14 @@ module Earthquake
 
     def reconnect
       item_queue.clear
+      stop_stream
       start_stream(config[:api])
+      config[:substreams].each{|e|
+        start_stream(e[:api]) if e[:activate]
+      }
     end
 
     def start_stream(options)
-      stop_stream
 
       options = {
         :oauth => config.slice(:consumer_key, :consumer_secret).merge(
@@ -146,27 +149,32 @@ module Earthquake
         )
       }.merge(options)
 
-      @stream = ::Twitter::JSONStream.connect(options)
+      stream = ::Twitter::JSONStream.connect(options)
 
-      @stream.each_item do |item|
+      stream.each_item do |item|
         item_queue << JSON.parse(item)
       end
 
-      @stream.on_error do |message|
+      stream.on_error do |message|
         notify "error: #{message}"
       end
 
-      @stream.on_reconnect do |timeout, retries|
+      stream.on_reconnect do |timeout, retries|
         notify "reconnecting in: #{timeout} seconds"
       end
 
-      @stream.on_max_reconnects do |timeout, retries|
+      stream.on_max_reconnects do |timeout, retries|
         notify "Failed after #{retries} failed reconnects"
       end
+      @streams = [] unless @streams
+      @streams << stream
     end
 
     def stop_stream
-      @stream.stop if @stream
+      return unless @streams
+      @streams.each{|s|
+        s.stop
+      }
     end
 
     def stop

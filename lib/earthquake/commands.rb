@@ -189,7 +189,11 @@ Earthquake.init do
   HELP
 
   command :user do |m|
-    ap twitter.show(m[1]).slice(*%w(id screen_name name profile_image_url description url location time_zone lang protected))
+    user = twitter.show(m[1])
+    if user.key?("error")
+      user = twitter.status(m[1])["user"] || {}
+    end
+    ap user.slice(*%w(id screen_name name profile_image_url description url location time_zone lang protected))
   end
 
   help :user, "show user info"
@@ -308,7 +312,7 @@ Earthquake.init do
     puts_items twitter.retweets_of_me
   end
 
-  help :retweeted_of_me, "shows your latest status somebody retweeted"
+  help :retweets_of_me, "shows your latest status somebody retweeted"
 
   command :block do |m|
     async_e { twitter.block(m[1]) }
@@ -378,14 +382,17 @@ Earthquake.init do
   help :update_profile_image, "updates profile image from local file path"
 
   command %r|^:open\s+(\d+)$|, :as => :open do |m|
-    if match = twitter.status(m[1])["text"].match(URI.regexp(["http", "https"]))
-      browse match[0]
+    matches = URI.extract(twitter.status(m[1])["text"],["http", "https"])
+    unless matches.empty?
+      matches.each do |match_url|
+        browse match_url
+      end
     else
       puts "no link found".c(41)
     end
   end
 
-  help :open, "opens the first link in a tweet"
+  help :open, "opens all links in a tweet"
 
   command :browse do |m|
     url = case m[1]
@@ -416,6 +423,13 @@ Earthquake.init do
 
   command :plugin_install do |m|
     uri = URI.parse(m[1])
+    if uri.host == "t.co"
+      begin
+        open(uri, redirect: false)
+      rescue OpenURI::HTTPRedirect => e
+        uri = URI.parse(e.io.meta["location"])
+      end
+    end
     unless uri.host == "gist.github.com"
       puts "the host must be gist.github.com".c(41)
     else
@@ -434,7 +448,7 @@ Earthquake.init do
       if confirm("Install to '#{filepath}'?")
         File.open(File.join(config[:plugin_dir], filename), 'w') do |file|
           file << raw
-          file << "\n# #{m[1]}"
+          file << "\n# #{uri}\n"
         end
         reload
       end

@@ -123,7 +123,7 @@ module Earthquake
     end
 
     completion do |text|
-      regexp = /^#{Regexp.quote(text)}/
+      regexp = /^#{Regexp.quote(text)}/i
       results = (command_names + command_aliases.keys).grep(regexp)
       next results if text.start_with?(?:) and (Readline.point rescue nil) == text.size
       history = Readline::HISTORY.reverse_each.take(config[:history_size]) | @tweets_for_completion

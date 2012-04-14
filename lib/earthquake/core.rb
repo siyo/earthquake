@@ -39,6 +39,7 @@ module Earthquake
     end
 
     def reload
+      Gem.refresh
       loaded = ActiveSupport::Dependencies.loaded.dup
       ActiveSupport::Dependencies.clear
       loaded.each { |lib| require_dependency lib }
@@ -49,18 +50,21 @@ module Earthquake
     end
 
     def load_config
+      consumer = YAML.load_file(File.expand_path('../../../consumer.yml', __FILE__))
+
       config[:dir]              ||= File.expand_path('~/.earthquake')
       config[:time_format]      ||= Time::DATE_FORMATS[:short]
       config[:plugin_dir]       ||= File.join(config[:dir], 'plugin')
       config[:file]             ||= File.join(config[:dir], 'config')
       config[:prompt]           ||= '⚡ '
-      config[:consumer_key]     ||= 'RmzuwQ5g0SYObMfebIKJag'
-      config[:consumer_secret]  ||= 'V98dYYmWm9JoG7qfOF0jhJaVEVW3QhGYcDJ9JQSXU'
+      config[:consumer_key]     ||= consumer['key']
+      config[:consumer_secret]  ||= consumer['secret']
       config[:output_interval]  ||= 1
       config[:history_size]     ||= 1000
       config[:api]              ||= { :host => 'userstream.twitter.com', :path => '/2/user.json', :ssl => true }
       config[:confirm_type]     ||= :y
       config[:expand_url]       ||= false
+      config[:thread_indent]    ||= "  "
 
       [config[:dir], config[:plugin_dir]].each do |dir|
         unless File.exists?(dir)

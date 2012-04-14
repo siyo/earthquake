@@ -161,7 +161,7 @@ Earthquake.init do
   HELP
 
   command :mentions do
-    puts_items twitter.mentions
+    puts_items twitter.mentions(:include_entities => :true)
   end
 
   help :mentions, "show mentions timeline"
@@ -378,7 +378,7 @@ Earthquake.init do
     end
     print "\e[2K\e[0G"
     puts_items thread.reverse_each.with_index{|tweet, indent|
-      tweet["_mark"] = "  " * indent
+      tweet["_mark"] = config[:thread_indent] * indent
     }
   end
 
@@ -493,4 +493,13 @@ Earthquake.init do
   end
 
   help :reauthorize, "prompts for new oauth credentials"
+
+  command %r{^:api\s+(get|post|delete|GET|POST|DELETE)\s+(.*)}, :as => :api do |m|
+    _, http_method, path = *m
+    ap twitter.send(http_method.downcase.to_sym, path)
+  end
+  help :api, "call twitter api ", <<-HELP
+    ⚡ :api post /statuses/update.json?status=test
+    ⚡ :api get /statuses/mentions.json?trim_user=true
+  HELP
 end

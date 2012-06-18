@@ -55,7 +55,7 @@ module Earthquake
 
     def default_config
       consumer = YAML.load_file(File.expand_path('../../../consumer.yml', __FILE__))
-      dir = File.expand_path('~/.earthquake')
+      dir = config[:dir] || File.expand_path('~/.earthquake')
       {
         dir:             dir,
         time_format:     Time::DATE_FORMATS[:short],
@@ -70,6 +70,7 @@ module Earthquake
         confirm_type:    :y,
         expand_url:      false,
         thread_indent:   "  ",
+        no_data_timeout: 30
       }
     end
 
@@ -85,7 +86,7 @@ module Earthquake
       if File.exists?(config[:file])
         load config[:file]
       else
-        File.open(config[:file], 'w')
+        File.open(config[:file], mode: 'w', perm: 0600).close
       end
 
       config.update(preferred_config) do |key, cur, new|
@@ -124,7 +125,7 @@ module Earthquake
       __init(options)
       restore_history
 
-      EventMachine::run do
+      EM.run do
         Thread.start do
           while buf = Readline.readline(config[:prompt], true)
             unless Readline::HISTORY.count == 1
@@ -136,19 +137,24 @@ module Earthquake
               input(buf.strip)
             }
           end
+          # unexpected
           stop
         end
 
-        Thread.start do
-          loop do
-            if Readline.line_buffer.nil? || Readline.line_buffer.empty?
-              sync { output }
+        EM.add_periodic_timer(config[:output_interval]) do
+          if @last_data_received_at && Time.now - @last_data_received_at > config[:no_data_timeout]
+            begin
+              reconnect
+            rescue EventMachine::ConnectionError => e
+              # ignore
             end
-            sleep config[:output_interval]
+          end
+          if Readline.line_buffer.nil? || Readline.line_buffer.empty?
+            sync { output }
           end
         end
 
-        reconnect
+        reconnect unless options[:'no-stream'] == true
 
         trap('INT') { stop }
       end
@@ -172,6 +178,7 @@ module Earthquake
       @stream = ::Twitter::JSONStream.connect(options)
 
       @stream.each_item do |item|
+        @last_data_received_at = Time.now # for reconnect when no data
         item_queue << JSON.parse(item)
       end
 
@@ -194,7 +201,7 @@ module Earthquake
 
     def stop
       stop_stream
-      EventMachine.stop_event_loop
+      EM.stop_event_loop
     end
 
     def store_history

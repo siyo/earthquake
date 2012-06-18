@@ -7,6 +7,10 @@ module Earthquake
       @config ||= {}
     end
 
+    def preferred_config
+      @preferred_config ||= {}
+    end
+
     def item_queue
       @item_queue ||= []
     end
@@ -39,6 +43,7 @@ module Earthquake
     end
 
     def reload
+      Gem.refresh
       loaded = ActiveSupport::Dependencies.loaded.dup
       ActiveSupport::Dependencies.clear
       loaded.each { |lib| require_dependency lib }
@@ -48,19 +53,29 @@ module Earthquake
       _init
     end
 
+    def default_config
+      consumer = YAML.load_file(File.expand_path('../../../consumer.yml', __FILE__))
+      dir = config[:dir] || File.expand_path('~/.earthquake')
+      {
+        dir:             dir,
+        time_format:     Time::DATE_FORMATS[:short],
+        plugin_dir:      File.join(dir, 'plugin'),
+        file:            File.join(dir, 'config'),
+        prompt:          '⚡ ',
+        consumer_key:    consumer['key'],
+        consumer_secret: consumer['secret'],
+        output_interval: 1,
+        history_size:    1000,
+        api:             { :host => 'userstream.twitter.com', :path => '/2/user.json', :ssl => true },
+        confirm_type:    :y,
+        expand_url:      false,
+        thread_indent:   "  ",
+        no_data_timeout: 30
+      }
+    end
+
     def load_config
-      config[:dir]              ||= File.expand_path('~/.earthquake')
-      config[:time_format]      ||= Time::DATE_FORMATS[:short]
-      config[:plugin_dir]       ||= File.join(config[:dir], 'plugin')
-      config[:file]             ||= File.join(config[:dir], 'config')
-      config[:prompt]           ||= '⚡ '
-      config[:consumer_key]     ||= 'RmzuwQ5g0SYObMfebIKJag'
-      config[:consumer_secret]  ||= 'V98dYYmWm9JoG7qfOF0jhJaVEVW3QhGYcDJ9JQSXU'
-      config[:output_interval]  ||= 1
-      config[:history_size]     ||= 1000
-      config[:api]              ||= { :host => 'userstream.twitter.com', :path => '/2/user.json', :ssl => true }
-      config[:confirm_type]     ||= :y
-      config[:expand_url]       ||= false
+      config.reverse_update(default_config)
 
       [config[:dir], config[:plugin_dir]].each do |dir|
         unless File.exists?(dir)
@@ -71,7 +86,15 @@ module Earthquake
       if File.exists?(config[:file])
         load config[:file]
       else
-        File.open(config[:file], 'w')
+        File.open(config[:file], mode: 'w', perm: 0600).close
+      end
+
+      config.update(preferred_config) do |key, cur, new|
+        if Hash === cur and Hash === new
+          cur.merge(new)
+        else
+          new
+        end
       end
 
       get_access_token unless self.config[:token] && self.config[:secret]
@@ -102,7 +125,7 @@ module Earthquake
       __init(options)
       restore_history
 
-      EventMachine::run do
+      EM.run do
         Thread.start do
           while buf = Readline.readline(config[:prompt], true)
             unless Readline::HISTORY.count == 1
@@ -114,19 +137,24 @@ module Earthquake
               input(buf.strip)
             }
           end
+          # unexpected
           stop
         end
 
-        Thread.start do
-          loop do
-            if Readline.line_buffer.nil? || Readline.line_buffer.empty?
-              sync { output }
+        EM.add_periodic_timer(config[:output_interval]) do
+          if @last_data_received_at && Time.now - @last_data_received_at > config[:no_data_timeout]
+            begin
+              reconnect
+            rescue EventMachine::ConnectionError => e
+              # ignore
             end
-            sleep config[:output_interval]
+          end
+          if Readline.line_buffer.nil? || Readline.line_buffer.empty?
+            sync { output }
           end
         end
 
-        reconnect
+        reconnect unless options[:'no-stream'] == true
 
         trap('INT') { stop }
       end
@@ -150,6 +178,7 @@ module Earthquake
       @stream = ::Twitter::JSONStream.connect(options)
 
       @stream.each_item do |item|
+        @last_data_received_at = Time.now # for reconnect when no data
         item_queue << JSON.parse(item)
       end
 
@@ -172,7 +201,7 @@ module Earthquake
 
     def stop
       stop_stream
-      EventMachine.stop_event_loop
+      EM.stop_event_loop
     end
 
     def store_history

@@ -8,7 +8,7 @@ module Twitter
         reconnect @options[:host], @options[:port]
         start_tls if @options[:ssl]
       else
-        EventMachine.add_timer(timeout) do
+        EM.add_timer(timeout) do
           reconnect @options[:host], @options[:port]
           start_tls if @options[:ssl]
         end
@@ -19,6 +19,8 @@ end
 
 module TwitterOAuth
   class Client
+    [:get, :post, :delete].each { |m| public m }
+
     private
     def consumer
       @consumer ||= OAuth::Consumer.new(

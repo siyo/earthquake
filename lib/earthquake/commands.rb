@@ -42,6 +42,29 @@ Earthquake.init do
     ⚡ :help :retweet
   HELP
 
+  # :config
+
+  command :config do
+    ap config
+  end
+
+  command :config do |m|
+    key, value = m[1].split(/\s+/, 2)
+    key = key.to_sym
+    if value
+      value = eval(value)
+      preferred_config.store(key, value)
+      reload
+    end
+    ap config.slice(key)
+  end
+
+  help :config, 'show or set config', <<-HELP
+    ⚡ :config
+    ⚡ :config key
+    ⚡ :config key value
+  HELP
+
   # :restart
 
   command :restart do
@@ -85,16 +108,28 @@ Earthquake.init do
     ⚡ :aa :status $aa
   HELP
 
+  def self._eval_as_ruby_string(text)
+    return text unless config[:eval_as_ruby_string_for_update]
+    begin
+      text = eval(%|"#{text.gsub('"', '\"')}"|)
+    rescue Exception => e
+      puts e.message.c(:notice)
+    end
+    text
+  end
+
   command %r|^:update$|, :as => :update do
     puts "[input EOF (e.g. Ctrl+D) at the last]".c(:info)
     text = STDIN.gets(nil)
+    text = _eval_as_ruby_string(text)
     if text && !text.split.empty?
       async_e{ twitter.update(text) } if confirm("update above AA?")
     end
   end
 
   command :update do |m|
-    async_e { twitter.update(m[1]) } if confirm("update '#{m[1]}'")
+    text = _eval_as_ruby_string(m[1])
+    async_e { twitter.update(text) } if confirm("update '#{text}'")
   end
 
   command %r|^[^:\$].*| do |m|
@@ -161,7 +196,7 @@ Earthquake.init do
   HELP
 
   command :mentions do
-    puts_items twitter.mentions
+    puts_items twitter.mentions(:include_entities => :true)
   end
 
   help :mentions, "show mentions timeline"
@@ -378,7 +413,7 @@ Earthquake.init do
     end
     print "\e[2K\e[0G"
     puts_items thread.reverse_each.with_index{|tweet, indent|
-      tweet["_mark"] = "  " * indent
+      tweet["_mark"] = config[:thread_indent] * indent
     }
   end
 
@@ -445,15 +480,15 @@ Earthquake.init do
     else
       puts "..."
       gist_id = uri.path[/\d+/]
-      meta = JSON.parse(open("https://gist.github.com/api/v1/json/#{gist_id}").read)
-      filename = meta["gists"][0]["files"][0]
+      meta = JSON.parse(open("https://api.github.com/gists/#{gist_id}").read)
+      filename = meta["files"].keys[0]
       raw = open("https://gist.github.com/raw/#{gist_id}/#{filename}").read
 
       puts '-' * 80
       puts raw.c(36)
       puts '-' * 80
 
-      filename = "#{meta["gists"][0]["repo"]}.rb" if filename =~ /^gistfile/
+      filename = "#{meta["id"]}.rb" if filename =~ /^gistfile/
       filepath = File.join(config[:plugin_dir], filename)
       if confirm("Install to '#{filepath}'?")
         File.open(File.join(config[:plugin_dir], filename), 'w') do |file|
@@ -493,4 +528,13 @@ Earthquake.init do
   end
 
   help :reauthorize, "prompts for new oauth credentials"
+
+  command %r{^:api\s+(get|post|delete|GET|POST|DELETE)\s+(.*)}, :as => :api do |m|
+    _, http_method, path = *m
+    ap twitter.send(http_method.downcase.to_sym, path)
+  end
+  help :api, "call twitter api ", <<-HELP
+    ⚡ :api post /statuses/update.json?status=test
+    ⚡ :api get /statuses/mentions.json?trim_user=true
+  HELP
 end

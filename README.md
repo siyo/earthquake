@@ -142,6 +142,37 @@ Commands
     # return to normal user stream
     ⚡ :filter off
 
+### Show config
+
+    # All config
+    ⚡ :config
+
+    # config for :key
+    ⚡ :config key
+
+### Set config
+
+    # set config for :key to (evaluated) value
+    ⚡ :config key 1 + 1
+    {
+        :key => 2
+    }
+    ⚡ :config key {foo: 1, bar: 2}
+    {
+        :key => {
+            :foo => 1,
+            :bar => 2
+        }
+    }
+    # merge new config if both are Hash
+    ⚡ :config key {bar: 3}
+    {
+        :key => {
+            :foo => 1,
+            :bar => 3
+        }
+    }
+
 And more!
 
 Configuration

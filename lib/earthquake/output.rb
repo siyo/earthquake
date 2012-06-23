@@ -151,7 +151,7 @@ module Earthquake
           screen_name = twitter.info["screen_name"]
           text = "(direct message)"
         end
-        puts ("%s %s: %s" % ["[delete]", screen_name, text]).c(:event)
+        puts ("%s %s: %s" % ["[delete]".c(:event), screen_name, text])
       end
     end
 

@@ -206,8 +206,8 @@ module Earthquake
 
     def store_history
       history_size = config[:history_size]
-      File.open(File.join(config[:dir], 'history'), 'w') do |file|
-        lines = Readline::HISTORY.to_a[([Readline::HISTORY.size - history_size, 0].max)..-1]
+      File.open(File.join(config[:dir], 'history'), 'w:utf-8') do |file|
+        lines = Readline::HISTORY.to_a.uniq[([Readline::HISTORY.size - history_size, 0].max)..-1]
         file.print(lines.join("\n"))
       end
     end
@@ -215,7 +215,7 @@ module Earthquake
     def restore_history
       history_file = File.join(config[:dir], 'history')
       begin
-        File.read(history_file, :encoding => "BINARY").
+        File.read(history_file,  :encoding => Encoding::UTF_8).
           encode!(:invalid => :replace, :undef => :replace).
           split(/\n/).
           each { |line| Readline::HISTORY << line }

@@ -246,15 +246,13 @@ module Earthquake
     end
 
     def error(e)
-      notify "[ERROR] #{e.message}\n#{e.backtrace.join("\n")}"
+      puts "[ERROR] #{e.message}\n    #{e.backtrace.join("\n    ")}".c(:notice)
     end
 
     def notify(message, options = {})
-      args = {:title => 'earthquake'}.update(options)
-      title = args.delete(:title)
+      title = options.delete(:title) || 'earthquake'
       message = message.is_a?(String) ? message : message.inspect
-      # FIXME: Escaping should be done at Notify.notify
-      Notify.notify title, message.e
+      Notify.notify title, message, options
     end
     alias_method :n, :notify
 

@@ -218,7 +218,7 @@ Earthquake.init do
   end
 
   # :recent jugyo
-  command %r|^:recent\s+([^\/\s]+)$|, :as => :recent do |m|
+  command %r|^:recent\s+@?([^\/\s]+)$|, :as => :recent do |m|
     puts_items twitter.user_timeline(:screen_name => m[1])
   end
 
@@ -395,7 +395,7 @@ Earthquake.init do
 
   help :sent_messages, "list direct messages sent"
 
-  command %r|^:message (\w+)\s+(.*)|, :as => :message do |m|
+  command %r|^:message @?(\w+)\s+(.*)|, :as => :message do |m|
     async_e { twitter.message(*m[1, 2]) } if confirm("message '#{m[2]}' to @#{m[1]}")
   end
 
@@ -482,7 +482,7 @@ Earthquake.init do
       gist_id = uri.path[/\d+/]
       meta = JSON.parse(open("https://api.github.com/gists/#{gist_id}").read)
       filename = meta["files"].keys[0]
-      raw = open("https://gist.github.com/raw/#{gist_id}/#{filename}").read
+      raw = meta['files'][filename]['content']
 
       puts '-' * 80
       puts raw.c(36)

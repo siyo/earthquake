@@ -1,33 +1,19 @@
 #!/usr/bin/env ruby
-require 'slop'
+require 'pathname'
+$:.unshift Pathname.new(__FILE__).realpath.join('../../lib') if $0 == __FILE__
+require 'earthquake/option_parser'
+require "earthquake/version"
 
-argv = ARGV.dup
-slop = Slop.new(:strict => true, :help => true)
-slop.banner "Usage: earthquake [options] [directory]"
-slop.on :d, :debug, 'Enable debug mode'
-slop.on :n, :'no-logo', 'No Logo'
-slop.on :c, :command, "Invoke a command and exit", true
-slop.on :'--no-stream', "No stream mode"
+option_parser = Earthquake::OptionParser.new(ARGV.dup)
+options = nil
 begin
-  slop.parse!(argv)
+  options = option_parser.parse
+rescue Earthquake::OptionParser::Help
+  exit
 rescue => e
   puts e
   exit!
 end
-options = slop.to_hash
-
-# XXX: work around slop's feature (bug?)
-options.each do |key, val|
-  val = val.nil? ? nil : true if key.to_s =~ /^no-/
-  options[key] = val
-end
-
-options.delete(:help)
-options[:dir] = argv.shift unless argv.empty?
-
-require 'pathname'
-$:.unshift Pathname.new(__FILE__).realpath.join('../../lib') if $0 == __FILE__
-require "earthquake/version"
 
 command = options.delete(:command)
 no_logo = options.delete(:'no-logo')

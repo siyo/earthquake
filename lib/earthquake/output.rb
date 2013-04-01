@@ -80,7 +80,7 @@ module Earthquake
       :event  => 42,
       :url    => [4, 36]
     )
-    config[:raw_text] ||= false
+    config[:raw_text] ||= true
 
     output :tweet do |item|
       next unless item["text"]
@@ -101,8 +101,13 @@ module Earthquake
       id = id2var(item["id"])
 
       text = (item["retweeted_status"] ? "RT @#{item["retweeted_status"]["user"]["screen_name"]}: #{item["retweeted_status"]["text"]}" : item["text"]).u
-      text.gsub!(/\s+/, ' ') unless config[:raw_text]
-      text.prepend("\n") if config[:raw_text]
+      if config[:raw_text] && /\n/ =~ text
+        text.prepend("\n")
+        text.gsub!(/\n/, "\n       " + "|".c(:info))
+        text << "\n      "
+      else
+        text.gsub!(/\s+/, ' ')
+      end
       text = text.coloring(/@[0-9A-Za-z_]+/) { |i| color_of(i) }
       text = text.coloring(/(^#[^\s]+)|(\s+#[^\s]+)/) { |i| color_of(i) }
       if config[:expand_url]

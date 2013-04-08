@@ -5,7 +5,7 @@ module Earthquake
   end
 
   init do
-    @twitter = TwitterOAuth::Client.new(config.slice(:consumer_key, :consumer_secret, :token, :secret))
+    @twitter = TwitterOAuth::Client.new(config.slice(:consumer_key, :consumer_secret, :token, :secret, :api_version, :secure))
 
     output do |item|
       next if item["text"].nil? || item["_disable_cache"]
@@ -30,24 +30,6 @@ module Earthquake
           end
         end
         alias_method_chain m, :cache
-      end
-
-      def initialize(options = {})
-        @consumer_key = options[:consumer_key]
-        @consumer_secret = options[:consumer_secret]
-        @token = options[:token]
-        @secret = options[:secret]
-        @proxy = ENV['http_proxy']
-      end
-
-      def consumer
-        options = { :site => 'http://api.twitter.com' }
-        options.update( :proxy => @proxy ) if @proxy
-        @consumer ||= OAuth::Consumer.new(
-          @consumer_key,
-          @consumer_secret,
-          options
-        )
       end
     end
   end

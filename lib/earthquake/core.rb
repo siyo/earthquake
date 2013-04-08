@@ -64,6 +64,8 @@ module Earthquake
         prompt:          '⚡ ',
         consumer_key:    consumer['key'],
         consumer_secret: consumer['secret'],
+        api_version:     '1.1',
+        secure:          true,
         output_interval: 1,
         history_size:    1000,
         api:             { :host => 'userstream.twitter.com', :path => '/2/user.json', :ssl => true },
@@ -132,7 +134,7 @@ module Earthquake
               Readline::HISTORY.pop if buf.empty? || Readline::HISTORY[-1] == Readline::HISTORY[-2]
             end
             sync {
-              reload
+              reload unless config[:reload] == false
               store_history
               input(buf.strip)
             }
